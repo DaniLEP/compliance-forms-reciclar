@@ -90,8 +90,7 @@ export default function TokenList() {
 
   const handleSendEmail = async (user) => {
     // 🔹 Corrigido link para o deploy Vercel
-    const baseFormURL = "https://formulario-complicance-instituto-reciclar.vercel.app/form";
-    const link = `${baseFormURL}?token=${user.token}`;
+    const baseFormURL = "https://formulario-complicance-instituto-reciclar.vercel.app/";    const link = `${baseFormURL}?token=${user.token}`;
 
     // Abre Gmail com email pré-preenchido
     window.open(
