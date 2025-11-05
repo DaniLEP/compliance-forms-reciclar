@@ -24,7 +24,7 @@ export default function App() {
       {/* Logo fixa no canto inferior direito */}
       <div className="fixed bottom-4 right-4 opacity-80 hover:opacity-100 transition-all">
         <img
-          src="/Logo.png"
+          src="./Logo.png"
           alt="Logo da Empresa"
           className="w-24 h-auto drop-shadow-md"
         />
