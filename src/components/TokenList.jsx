@@ -18,7 +18,7 @@ export default function TokenList() {
   }, []);
 
   const handleSendEmail = async (user) => {
-    const link = `https://seusistema.com/form?token=${user.token}`;
+    const link = `https://formulario-complicance-instituto-re-two.vercel.app/form?token=${user.token}`;
     window.open(
       `https://mail.google.com/mail/?view=cm&fs=1&to=${user.email}&su=Token de Acesso - Compliance Forms&body=Olá ${user.name},%0A%0AAcesse o formulário pelo link:%0A${link}%0A%0ASeu token: ${user.token}`
     );
