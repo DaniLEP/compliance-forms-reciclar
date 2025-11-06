@@ -27,27 +27,33 @@ export default function GenerateToken() {
     navigate("/dashboard");
   };
 
-  return (
-    <div className="p-6 bg-white rounded-xl shadow-lg max-w-md mx-auto mt-10">
-      <h2 className="text-xl font-semibold mb-4 text-gray-800">Gerar Token</h2>
+return (
+  <div className="p-10 bg-white rounded-2xl shadow-2xl max-w-2xl mx-auto mt-20">
+    <h2 className="text-2xl font-bold mb-6 text-gray-900 text-center">
+      Gerar Token
+    </h2>
+
+    <div className="space-y-4">
       <input
-        className="border w-full p-2 mb-3 rounded-md"
+        className="border border-gray-300 w-full p-3 rounded-lg text-gray-800 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition"
         placeholder="Nome do participante"
         value={name}
         onChange={(e) => setName(e.target.value)}
       />
       <input
-        className="border w-full p-2 mb-3 rounded-md"
+        className="border border-gray-300 w-full p-3 rounded-lg text-gray-800 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition"
         placeholder="Email do participante"
         value={email}
         onChange={(e) => setEmail(e.target.value)}
       />
       <button
         onClick={handleGenerate}
-        className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 w-full"
+        className="bg-gradient-to-br from-indigo-900 via-purple-900 to-pink-800 text-white px-6 py-3 rounded-lg hover:opacity-90 transition w-full font-medium shadow-md"
       >
         Gerar Token
       </button>
     </div>
-  );
+  </div>
+);
+
 }
