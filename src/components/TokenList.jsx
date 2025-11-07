@@ -46,10 +46,8 @@ Atenciosamente,
 
 (11) 3768-3607
 Equipe do Instituto Reciclar
-
 `,
 
- 
   whatsapp: ({ name, formURL }) => `
 Prezado(a) ${name},
 
@@ -67,22 +65,45 @@ Agradecemos desde já sua colaboração e atenção.
 
 Atenciosamente,
 Instituto Reciclar
-`
+`,
 }
 
 // ------------------------------------
 // 2️⃣ Função para gerar URL de envio
 // ------------------------------------
 function getSendURL(user, method, formURL) {
-  const template = MESSAGE_TEMPLATES[method]({ name: user.name, token: user.token, formURL })
+  if (!user || !method) return null
+
+  const template = MESSAGE_TEMPLATES[method]?.({
+    name: user.name || "Participante",
+    token: user.token || "",
+    formURL,
+  })
+
+  if (!template) return null
 
   if (method === "email") {
-    return `https://mail.google.com/mail/?view=cm&fs=1&to=${user.email}&su=Token de Acesso - Compliance Forms&body=${encodeURIComponent(template)}`
-  } else if (method === "whatsapp") {
-    if (!user.phone) return null
-    const phone = user.phone.replace(/\D/g, "")
-    return `https://wa.me/${phone}?text=${encodeURIComponent(template)}`
+    if (!user.email) return null
+    return `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(
+      user.email
+    )}&su=Token de Acesso - Compliance Forms&body=${encodeURIComponent(template)}`
   }
+
+  if (method === "whatsapp") {
+    if (!user.phone) return null
+
+    const phoneStr = String(user.phone)
+    const cleanedPhone = phoneStr.replace(/\D/g, "")
+
+    if (!cleanedPhone || cleanedPhone.length < 10) {
+      console.warn("Telefone inválido:", user.phone)
+      return null
+    }
+
+    return `https://wa.me/${cleanedPhone}?text=${encodeURIComponent(template)}`
+  }
+
+  return null
 }
 
 // ------------------------------------
@@ -105,6 +126,7 @@ export default function TokenList() {
       const list = Object.entries(data || {}).map(([token, info]) => ({
         token,
         ...info,
+        phone: info.phone ? String(info.phone) : "",
       }))
       setTokens(list)
       setLoading(false)
@@ -121,14 +143,21 @@ export default function TokenList() {
 
     const formURL = "https://formulario-complicance-instituto-re.vercel.app/"
     const url = getSendURL(user, method, formURL)
-    if (!url) return toast.error("Usuário sem número de WhatsApp cadastrado!")
+
+    if (!url) {
+      return toast.error(
+        method === "whatsapp"
+          ? "Usuário sem número de WhatsApp válido!"
+          : "Usuário sem email válido!"
+      )
+    }
 
     window.open(url, "_blank")
 
-    // Atualiza estado local
-    setTokens(prev => prev.map(t => (t.token === user.token ? { ...t, sent: true } : t)))
+    setTokens((prev) =>
+      prev.map((t) => (t.token === user.token ? { ...t, sent: true } : t))
+    )
 
-    // Atualiza Firebase
     try {
       await set(ref(db, `tokens/${user.token}/sent`), true)
       toast.success("Token enviado com sucesso!")
@@ -151,7 +180,7 @@ export default function TokenList() {
   // ------------------------------------
   // 3.4 Aplicar filtros
   // ------------------------------------
-  const filteredTokens = tokens.filter(t => {
+  const filteredTokens = tokens.filter((t) => {
     let usedCondition = true
     let sentCondition = true
 
@@ -167,9 +196,9 @@ export default function TokenList() {
   // ------------------------------------
   // 3.5 Estatísticas
   // ------------------------------------
-  const usedCount = filteredTokens.filter(t => t.used).length
+  const usedCount = filteredTokens.filter((t) => t.used).length
   const unusedCount = filteredTokens.length - usedCount
-  const sentCount = filteredTokens.filter(t => t.sent).length
+  const sentCount = filteredTokens.filter((t) => t.sent).length
   const notSentCount = filteredTokens.length - sentCount
 
   const pieData = [
@@ -207,8 +236,12 @@ export default function TokenList() {
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="mb-10">
-          <h1 className="text-3xl font-bold text-foreground mb-2">Painel de Controle</h1>
-          <p className="text-muted-foreground">Gerencie tokens de acesso e acompanhe o status dos envios</p>
+          <h1 className="text-3xl font-bold text-foreground mb-2">
+            Painel de Controle
+          </h1>
+          <p className="text-muted-foreground">
+            Gerencie tokens de acesso e acompanhe o status dos envios
+          </p>
         </div>
 
         {/* Estatísticas */}
@@ -217,49 +250,62 @@ export default function TokenList() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">Total de Tokens</p>
-                <p className="text-2xl font-bold text-foreground">{tokens.length}</p>
+                <p className="text-2xl font-bold text-foreground">
+                  {tokens.length}
+                </p>
               </div>
               <Mail className="h-8 w-8 text-primary opacity-20" />
             </div>
           </Card>
+
           <Card className="p-4">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">Enviados</p>
-                <p className="text-2xl font-bold text-foreground">{sentCount}</p>
+                <p className="text-2xl font-bold text-foreground">
+                  {sentCount}
+                </p>
               </div>
               <Send className="h-8 w-8 text-green-500 opacity-20" />
             </div>
           </Card>
+
           <Card className="p-4">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">Preenchidos</p>
-                <p className="text-2xl font-bold text-foreground">{usedCount}</p>
+                <p className="text-2xl font-bold text-foreground">
+                  {usedCount}
+                </p>
               </div>
               <CheckCircle2 className="h-8 w-8 text-emerald-500 opacity-20" />
             </div>
           </Card>
+
           <Card className="p-4">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">Pendentes</p>
-                <p className="text-2xl font-bold text-foreground">{notSentCount}</p>
+                <p className="text-2xl font-bold text-foreground">
+                  {notSentCount}
+                </p>
               </div>
               <Clock className="h-8 w-8 text-amber-500 opacity-20" />
             </div>
           </Card>
         </div>
 
-        {/* Filters */}
+        {/* Filtros */}
         <Card className="p-6 mb-8">
           <h2 className="text-lg font-semibold text-foreground mb-4">Filtros</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
-              <label className="block text-sm font-medium text-foreground mb-2">Status do Formulário</label>
+              <label className="block text-sm font-medium text-foreground mb-2">
+                Status do Formulário
+              </label>
               <select
                 value={filterUsed}
-                onChange={e => setFilterUsed(e.target.value)}
+                onChange={(e) => setFilterUsed(e.target.value)}
                 className="w-full px-3 py-2 border border-border rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
               >
                 <option value="all">Todos</option>
@@ -268,10 +314,12 @@ export default function TokenList() {
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-foreground mb-2">Status de Envio</label>
+              <label className="block text-sm font-medium text-foreground mb-2">
+                Status de Envio
+              </label>
               <select
                 value={filterSent}
-                onChange={e => setFilterSent(e.target.value)}
+                onChange={(e) => setFilterSent(e.target.value)}
                 className="w-full px-3 py-2 border border-border rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
               >
                 <option value="all">Todos</option>
@@ -282,15 +330,28 @@ export default function TokenList() {
           </div>
         </Card>
 
-        {/* Charts */}
+        {/* Gráficos */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
           <Card className="p-6">
-            <h3 className="text-lg font-semibold text-foreground mb-4">Status dos Formulários</h3>
+            <h3 className="text-lg font-semibold text-foreground mb-4">
+              Status dos Formulários
+            </h3>
             <ResponsiveContainer width="100%" height={300}>
               <PieChart>
-                <Pie data={pieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} label>
+                <Pie
+                  data={pieData}
+                  dataKey="value"
+                  nameKey="name"
+                  cx="50%"
+                  cy="50%"
+                  outerRadius={80}
+                  label
+                >
                   {pieData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    <Cell
+                      key={`cell-${index}`}
+                      fill={COLORS[index % COLORS.length]}
+                    />
                   ))}
                 </Pie>
                 <PieTooltip />
@@ -300,14 +361,19 @@ export default function TokenList() {
           </Card>
 
           <Card className="p-6">
-            <h3 className="text-lg font-semibold text-foreground mb-4">Status dos Envios</h3>
+            <h3 className="text-lg font-semibold text-foreground mb-4">
+              Status dos Envios
+            </h3>
             <ResponsiveContainer width="100%" height={300}>
               <BarChart data={barData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
                 <XAxis dataKey="status" stroke="var(--foreground)" />
                 <YAxis stroke="var(--foreground)" />
                 <Tooltip
-                  contentStyle={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}
+                  contentStyle={{
+                    backgroundColor: "var(--card)",
+                    border: "1px solid var(--border)",
+                  }}
                   labelStyle={{ color: "var(--foreground)" }}
                 />
                 <Legend />
@@ -317,30 +383,57 @@ export default function TokenList() {
           </Card>
         </div>
 
-        {/* Table */}
+        {/* Tabela */}
         <Card className="overflow-hidden">
           <div className="overflow-x-auto">
             {filteredTokens.length === 0 ? (
               <div className="p-8 text-center">
-                <p className="text-muted-foreground">Nenhum token encontrado com os filtros aplicados.</p>
+                <p className="text-muted-foreground">
+                  Nenhum token encontrado com os filtros aplicados.
+                </p>
               </div>
             ) : (
               <table className="w-full">
                 <thead>
                   <tr className="bg-muted border-b border-border">
-                    <th className="px-6 py-3 text-left text-sm font-semibold text-foreground">Nome</th>
-                    <th className="px-6 py-3 text-left text-sm font-semibold text-foreground">Email</th>
-                    <th className="px-6 py-3 text-left text-sm font-semibold text-foreground">Token</th>
-                    <th className="px-6 py-3 text-left text-sm font-semibold text-foreground">Formulário</th>
-                    <th className="px-6 py-3 text-left text-sm font-semibold text-foreground">Envio</th>
-                    <th className="px-6 py-3 text-left text-sm font-semibold text-foreground">Ações</th>
+                    <th className="px-6 py-3 text-left text-sm font-semibold text-foreground">
+                      Nome
+                    </th>
+                    <th className="px-6 py-3 text-left text-sm font-semibold text-foreground">
+                      Email
+                    </th>
+                    <th className="px-6 py-3 text-left text-sm font-semibold text-foreground">
+                      Telefone
+                    </th>
+                    <th className="px-6 py-3 text-left text-sm font-semibold text-foreground">
+                      Token
+                    </th>
+                    <th className="px-6 py-3 text-left text-sm font-semibold text-foreground">
+                      Formulário
+                    </th>
+                    <th className="px-6 py-3 text-left text-sm font-semibold text-foreground">
+                      Envio
+                    </th>
+                    <th className="px-6 py-3 text-left text-sm font-semibold text-foreground">
+                      Ações
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredTokens.map((t) => (
-                    <tr key={t.token} className="border-b border-border hover:bg-muted/50 transition-colors">
-                      <td className="px-6 py-4 text-sm text-foreground">{t.name}</td>
-                      <td className="px-6 py-4 text-sm text-foreground">{t.email}</td>
+                    <tr
+                      key={t.token}
+                      className="border-b border-border hover:bg-muted/50 transition-colors"
+                    >
+                      <td className="px-6 py-4 text-sm text-foreground">
+                        {t.name}
+                      </td>
+                      <td className="px-6 py-4 text-sm text-foreground">
+                        {t.email || "—"}
+                      </td>
+                      <td className="px-6 py-4 text-sm text-foreground">
+                        {t.phone || "—"}
+                      </td>
                       <td className="px-6 py-4 text-sm">
                         <div className="flex items-center gap-2">
                           <code className="text-xs font-mono bg-muted px-2 py-1 rounded text-foreground">
@@ -358,7 +451,9 @@ export default function TokenList() {
                       <td className="px-6 py-4 text-sm">
                         <span
                           className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium ${
-                            t.used ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-700"
+                            t.used
+                              ? "bg-green-100 text-green-700"
+                              : "bg-amber-100 text-amber-700"
                           }`}
                         >
                           {t.used ? (
@@ -377,7 +472,9 @@ export default function TokenList() {
                       <td className="px-6 py-4 text-sm">
                         <span
                           className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium ${
-                            t.sent ? "bg-blue-100 text-blue-700" : "bg-gray-100 text-gray-700"
+                            t.sent
+                              ? "bg-blue-100 text-blue-700"
+                              : "bg-gray-100 text-gray-700"
                           }`}
                         >
                           {t.sent ? (
@@ -397,19 +494,27 @@ export default function TokenList() {
                         <div className="flex items-center gap-2">
                           {!t.sent && (
                             <>
-                              <Button onClick={() => handleSend(t, "email")} className="text-xs" size="sm">
+                              <Button
+                                onClick={() => handleSend(t, "email")}
+                                className="text-xs"
+                                size="sm"
+                              >
                                 <Send className="h-3 w-3 mr-1" />
                                 Gmail
                               </Button>
-                              <Button onClick={() => handleSend(t, "whatsapp")} className="text-xs" size="sm" variant="outline">
+                              <Button
+                                onClick={() => handleSend(t, "whatsapp")}
+                                className="text-xs"
+                                size="sm"
+                                variant="outline"
+                              >
                                 <svg
                                   xmlns="http://www.w3.org/2000/svg"
                                   viewBox="0 0 24 24"
                                   fill="currentColor"
                                   className="h-4 w-4 mr-1 text-green-600"
                                 >
-                                  <path d="M17.472 14.382c-.297-.149-1.758-.867-2.031-.967-.273-.1-.472-.149-.672.15-.197.297-.771.966-.945 1.164-.173.198-.348.223-.645.075-.297-.149-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.447-.52.149-.174.198-.298.298-.497.1-.198.05-.373-.025-.522-.075-.149-.672-1.611-.921-2.206-.242-.58-.487-.502-.672-.512-.173-.009-.373-.011-.573-.011-.198 0-.522.074-.796.372-.273.297-1.045 1.02-1.045 2.48 0 1.46 1.07 2.876 1.219 3.074.149.198 2.105 3.21 5.1 4.505.714.308 1.27.493 1.703.63.715.228 1.366.195 1.88.118.573-.086 1.758-.718 2.006-1.412.248-.694.248-1.29.173-1.412-.074-.123-.272-.198-.57-.347z" />
-                                  <path d="M12.004 2.003c-5.525 0-10.002 4.477-10.002 10.002 0 1.764.46 3.49 1.332 5.013L2 22l5.1-1.327a9.965 9.965 0 0 0 4.904 1.25h.004c5.524 0 10.002-4.478 10.002-10.002 0-2.67-1.04-5.182-2.928-7.07A9.965 9.965 0 0 0 12.004 2.003zM12 20.002h-.003a8.274 8.274 0 0 1-4.205-1.155l-.302-.179-3.03.789.808-2.957-.197-.305A8.27 8.27 0 0 1 3.727 12c0-4.565 3.709-8.274 8.277-8.274a8.24 8.24 0 0 1 5.871 2.429A8.228 8.228 0 0 1 20.275 12c0 4.566-3.71 8.274-8.275 8.274z" />
+                                  <path d="M17.472 14.382c-.297-.149-1.758-.867-2.031-.967-.273-.1-.472-.149-.672.15-.197.297-.771.966-.945 1.164-.173.198-.348.223-.645.075-.297-.149-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.447-.52.149-.173.198-.298.298-.497.1-.198.05-.372-.025-.521-.075-.149-.672-1.617-.921-2.217-.242-.58-.487-.502-.672-.512l-.573-.01c-.198 0-.52.074-.792.372s-1.04 1.016-1.04 2.479 1.065 2.876 1.213 3.074c.149.198 2.095 3.2 5.076 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z" />
                                 </svg>
                                 WhatsApp
                               </Button>
