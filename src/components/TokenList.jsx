@@ -1,4 +1,4 @@
-// "use client"
+"use client"
 
 import { useEffect, useState } from "react"
 import { ref, onValue, set } from "firebase/database"
@@ -21,7 +21,73 @@ import {
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Mail, CheckCircle2, Clock, Send, Copy } from "lucide-react"
+import toast, { Toaster } from "react-hot-toast"
 
+// ------------------------------------
+// 1️⃣ Modelos de mensagens formais
+// ------------------------------------
+const MESSAGE_TEMPLATES = {
+  email: ({ name, token, formURL }) => `
+Prezado(a) ${name},
+
+Espero que esta mensagem o(a) encontre bem.
+
+Segue abaixo o link para acesso ao formulário de compliance:
+
+${formURL}
+
+🔑 Token de acesso: ${token}
+
+Solicitamos que copie este token e insira no formulário para que o processo seja concluído corretamente.
+
+Agradecemos sua atenção e colaboração.
+
+Atenciosamente,
+
+(11) 3768-3607
+Equipe do Instituto Reciclar
+
+`,
+
+ 
+  whatsapp: ({ name, formURL }) => `
+Prezado(a) ${name},
+
+Esperamos que esta mensagem o(a) encontre bem.
+
+Segue o link para acesso ao formulário de compliance:
+
+${formURL}
+
+🔑 O token de acesso será enviado abaixo. Por favor, aguarde a mensagem com o token para completar o preenchimento do formulário.
+
+Solicitamos a gentileza de preencher o formulário com atenção, conforme as orientações fornecidas previamente.
+
+Agradecemos desde já sua colaboração e atenção.
+
+Atenciosamente,
+Instituto Reciclar
+`
+}
+
+// ------------------------------------
+// 2️⃣ Função para gerar URL de envio
+// ------------------------------------
+function getSendURL(user, method, formURL) {
+  const template = MESSAGE_TEMPLATES[method]({ name: user.name, token: user.token, formURL })
+
+  if (method === "email") {
+    return `https://mail.google.com/mail/?view=cm&fs=1&to=${user.email}&su=Token de Acesso - Compliance Forms&body=${encodeURIComponent(template)}`
+  } else if (method === "whatsapp") {
+    if (!user.phone) return null
+    const phone = user.phone.replace(/\D/g, "")
+    return `https://wa.me/${phone}?text=${encodeURIComponent(template)}`
+  }
+}
+
+// ------------------------------------
+// 3️⃣ Componente principal
+// ------------------------------------
 export default function TokenList() {
   const [tokens, setTokens] = useState([])
   const [filterUsed, setFilterUsed] = useState("all")
@@ -29,6 +95,9 @@ export default function TokenList() {
   const [loading, setLoading] = useState(true)
   const [copiedToken, setCopiedToken] = useState(null)
 
+  // ------------------------------------
+  // 3.1 Carregar tokens do Firebase
+  // ------------------------------------
   useEffect(() => {
     const tokensRef = ref(db, "tokens")
     const unsubscribe = onValue(tokensRef, (snapshot) => {
@@ -44,52 +113,45 @@ export default function TokenList() {
     return () => unsubscribe()
   }, [])
 
-  // Envio unificado: Gmail ou WhatsApp
+  // ------------------------------------
+  // 3.2 Envio de mensagem (Gmail ou WhatsApp)
+  // ------------------------------------
   const handleSend = async (user, method) => {
-    if (user.sent) {
-      alert("Este token já foi enviado!")
-      return
-    }
+    if (user.sent) return toast.error("Este token já foi enviado!")
 
-    const baseFormURL = "https://formulario-complicance-instituto-re.vercel.app/"
-    const message = `Olá ${user.name}!%0A%0AAcesse o formulário:%0A${baseFormURL}%0A%0A🔑 Seu token: ${user.token}%0A%0ACopie o token e cole no formulário.%0A%0AObrigado!`
+    const formURL = "https://formulario-complicance-instituto-re.vercel.app/"
+    const url = getSendURL(user, method, formURL)
+    if (!url) return toast.error("Usuário sem número de WhatsApp cadastrado!")
 
-    if (method === "email") {
-      window.open(
-        `https://mail.google.com/mail/?view=cm&fs=1&to=${user.email}&su=Token de Acesso - Compliance Forms&body=${message}`,
-        "_blank"
-      )
-    } else if (method === "whatsapp") {
-      if (!user.phone) {
-        alert("Usuário sem número de WhatsApp cadastrado!")
-        return
-      }
-      const phone = user.phone.replace(/\D/g, "")
-      window.open(`https://wa.me/${phone}?text=${message}`, "_blank")
-    }
+    window.open(url, "_blank")
 
-    // Atualiza estado local para remover botão imediatamente
-    setTokens(prev =>
-      prev.map(t => (t.token === user.token ? { ...t, sent: true } : t))
-    )
+    // Atualiza estado local
+    setTokens(prev => prev.map(t => (t.token === user.token ? { ...t, sent: true } : t)))
 
-    // Marca como enviado no Firebase
+    // Atualiza Firebase
     try {
       await set(ref(db, `tokens/${user.token}/sent`), true)
+      toast.success("Token enviado com sucesso!")
     } catch (err) {
       console.error("Erro ao atualizar status de envio:", err)
+      toast.error("Erro ao atualizar status de envio")
     }
   }
 
-  // Copiar token
+  // ------------------------------------
+  // 3.3 Copiar token
+  // ------------------------------------
   const handleCopyToken = (token) => {
     navigator.clipboard.writeText(token)
     setCopiedToken(token)
+    toast.success("Token copiado!")
     setTimeout(() => setCopiedToken(null), 2000)
   }
 
-  // Filtros
-  const filteredTokens = tokens.filter((t) => {
+  // ------------------------------------
+  // 3.4 Aplicar filtros
+  // ------------------------------------
+  const filteredTokens = tokens.filter(t => {
     let usedCondition = true
     let sentCondition = true
 
@@ -102,10 +164,12 @@ export default function TokenList() {
     return usedCondition && sentCondition
   })
 
-  // Estatísticas
-  const usedCount = filteredTokens.filter((t) => t.used).length
+  // ------------------------------------
+  // 3.5 Estatísticas
+  // ------------------------------------
+  const usedCount = filteredTokens.filter(t => t.used).length
   const unusedCount = filteredTokens.length - usedCount
-  const sentCount = filteredTokens.filter((t) => t.sent).length
+  const sentCount = filteredTokens.filter(t => t.sent).length
   const notSentCount = filteredTokens.length - sentCount
 
   const pieData = [
@@ -120,6 +184,9 @@ export default function TokenList() {
 
   const COLORS = ["#0b6be9ff", "#4a157aff"]
 
+  // ------------------------------------
+  // 3.6 Loading
+  // ------------------------------------
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-background">
@@ -131,8 +198,12 @@ export default function TokenList() {
     )
   }
 
+  // ------------------------------------
+  // 3.7 Render
+  // ------------------------------------
   return (
     <div className="max-h-screen bg-background p-6 md:p-8">
+      <Toaster position="top-right" />
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="mb-10">
@@ -140,7 +211,7 @@ export default function TokenList() {
           <p className="text-muted-foreground">Gerencie tokens de acesso e acompanhe o status dos envios</p>
         </div>
 
-        {/* Stats */}
+        {/* Estatísticas */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
           <Card className="p-4">
             <div className="flex items-center justify-between">
@@ -188,7 +259,7 @@ export default function TokenList() {
               <label className="block text-sm font-medium text-foreground mb-2">Status do Formulário</label>
               <select
                 value={filterUsed}
-                onChange={(e) => setFilterUsed(e.target.value)}
+                onChange={e => setFilterUsed(e.target.value)}
                 className="w-full px-3 py-2 border border-border rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
               >
                 <option value="all">Todos</option>
@@ -200,7 +271,7 @@ export default function TokenList() {
               <label className="block text-sm font-medium text-foreground mb-2">Status de Envio</label>
               <select
                 value={filterSent}
-                onChange={(e) => setFilterSent(e.target.value)}
+                onChange={e => setFilterSent(e.target.value)}
                 className="w-full px-3 py-2 border border-border rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
               >
                 <option value="all">Todos</option>
@@ -282,7 +353,6 @@ export default function TokenList() {
                           >
                             <Copy className="h-4 w-4 text-muted-foreground hover:text-foreground" />
                           </button>
-                          {copiedToken === t.token && <span className="text-xs text-green-600">Copiado!</span>}
                         </div>
                       </td>
                       <td className="px-6 py-4 text-sm">
